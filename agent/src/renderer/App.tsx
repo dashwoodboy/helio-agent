@@ -1,0 +1,271 @@
+import { useEffect, useState } from "react";
+
+interface Stick {
+  serial: number | null;
+  ip: string;
+  mac: string | null;
+  reachable: boolean;
+  manual: boolean;
+}
+
+interface UiState {
+  view: "signin" | "status";
+  status: string;
+  serverUrl: string;
+  agentName: string;
+  sticks: Stick[];
+  pairing: { userCode: string; verificationUrl: string } | null;
+  pairingError: string | null;
+  autostart: boolean;
+  secureStorage: boolean;
+  version: string;
+}
+
+interface Bridge {
+  getState: () => Promise<UiState>;
+  onState: (cb: (state: UiState) => void) => () => void;
+  startPairing: (serverUrl: string) => Promise<void>;
+  cancelPairing: () => Promise<void>;
+  openVerification: () => Promise<void>;
+  signOut: () => Promise<void>;
+  setAutostart: (enabled: boolean) => Promise<void>;
+  rescan: () => Promise<void>;
+  addManualStick: (ip: string, port: number) => Promise<string | null>;
+  removeManualStick: (ip: string) => Promise<void>;
+}
+
+const helio = (window as unknown as { helio: Bridge }).helio;
+
+const STATUS_LABEL: Record<string, string> = {
+  idle: "Not connected",
+  connecting: "Connecting…",
+  online: "Connected to Helio",
+  offline: "Reconnecting…",
+  unauthorized: "Signed out",
+  replaced: "Another agent instance took over",
+};
+
+export function App(): React.JSX.Element {
+  const [state, setState] = useState<UiState | null>(null);
+
+  useEffect(() => {
+    void helio.getState().then(setState);
+    return helio.onState(setState);
+  }, []);
+
+  if (!state) return <div className="shell" />;
+  return (
+    <div className="shell">
+      <header className="head">
+        <span className="logo">☀</span>
+        <div>
+          <h1>Helio Agent</h1>
+          <p className="muted">v{state.version}</p>
+        </div>
+      </header>
+      {state.view === "signin" ? <SignIn state={state} /> : <Status state={state} />}
+      {!state.secureStorage && (
+        <p className="warn">
+          No OS keyring was found — the agent token is stored in a protected file instead.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SignIn({ state }: { state: UiState }): React.JSX.Element {
+  const [serverUrl, setServerUrl] = useState(state.serverUrl);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const start = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      await helio.startPairing(serverUrl);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (state.pairing) {
+    return (
+      <main className="card">
+        <h2>Approve this computer</h2>
+        <p>
+          A browser window opened on the Helio website. Check that it shows this code and approve:
+        </p>
+        <div className="code">{state.pairing.userCode}</div>
+        <p className="muted">
+          Only approve if you just started the Helio Agent on your own computer.
+        </p>
+        <div className="row">
+          <button onClick={() => void helio.openVerification()}>Open browser again</button>
+          <button className="ghost" onClick={() => void helio.cancelPairing()}>
+            Cancel
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="card">
+      <h2>Sign in</h2>
+      <p>
+        Link this computer ({state.agentName}) to your Helio account. Your browser opens and shows
+        a code to approve — no password is typed here.
+      </p>
+      {state.pairingError && <p className="error">{state.pairingError}</p>}
+      <button disabled={busy} onClick={() => void start()}>
+        {busy ? "Starting…" : "Sign in with the browser"}
+      </button>
+      <button className="link" onClick={() => setShowAdvanced((v) => !v)}>
+        Advanced
+      </button>
+      {showAdvanced && (
+        <label className="field">
+          Helio server
+          <input
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
+            placeholder="https://helio-power.eu"
+            spellCheck={false}
+          />
+          <span className="muted">Only https:// servers are accepted.</span>
+        </label>
+      )}
+    </main>
+  );
+}
+
+function Status({ state }: { state: UiState }): React.JSX.Element {
+  const online = state.status === "online";
+  const [showAdd, setShowAdd] = useState(false);
+  const [addIp, setAddIp] = useState("");
+  const [addPort, setAddPort] = useState("8899");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const addStick = async (): Promise<void> => {
+    setAdding(true);
+    setAddError(null);
+    try {
+      const error = await helio.addManualStick(addIp.trim(), Number(addPort) || 8899);
+      if (error) {
+        setAddError(error);
+      } else {
+        setAddIp("");
+        setShowAdd(false);
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <main className="card">
+      <div className="statusRow">
+        <span className={`dot ${online ? "ok" : "bad"}`} />
+        <div>
+          <strong>{STATUS_LABEL[state.status] ?? state.status}</strong>
+          <p className="muted">{state.serverUrl}</p>
+        </div>
+      </div>
+
+      <h2>
+        Sticks on your network
+        <button className="ghost small" onClick={() => void helio.rescan()}>
+          Rescan
+        </button>
+      </h2>
+      {state.sticks.length === 0 ? (
+        <p className="muted">
+          No Solarman sticks found yet. Make sure this computer is on the same network as the
+          inverter — scanning repeats every 30 seconds. If the stick is on another network or
+          ignores the scan, add it by IP below.
+        </p>
+      ) : (
+        <ul className="sticks">
+          {state.sticks.map((s) => (
+            <li key={`${s.ip}-${s.serial ?? "x"}`}>
+              <span className={`dot ${s.reachable ? "ok" : "bad"}`} />
+              <div className="stickInfo">
+                <strong>{s.serial ?? "Serial unknown"}</strong>
+                <p className="muted">
+                  {s.ip}
+                  {s.mac ? ` · ${s.mac}` : ""}
+                  {s.manual ? " · added by IP" : ""}
+                </p>
+              </div>
+              {s.manual && (
+                <button
+                  className="ghost small"
+                  title="Forget this stick"
+                  onClick={() => void helio.removeManualStick(s.ip)}
+                >
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showAdd ? (
+        <div className="addStick">
+          <div className="row">
+            <label className="field grow">
+              Stick IP address
+              <input
+                value={addIp}
+                onChange={(e) => setAddIp(e.target.value)}
+                placeholder="192.168.1.137"
+                spellCheck={false}
+                autoFocus
+              />
+            </label>
+            <label className="field portField">
+              Port
+              <input
+                value={addPort}
+                onChange={(e) => setAddPort(e.target.value)}
+                placeholder="8899"
+                spellCheck={false}
+              />
+            </label>
+          </div>
+          {addError && <p className="error">{addError}</p>}
+          <div className="row">
+            <button disabled={adding || !addIp.trim()} onClick={() => void addStick()}>
+              {adding ? "Checking…" : "Add stick"}
+            </button>
+            <button className="ghost" onClick={() => setShowAdd(false)}>
+              Cancel
+            </button>
+          </div>
+          <p className="muted">
+            The serial is picked up automatically when the stick answers; Solarman sticks listen
+            on port 8899.
+          </p>
+        </div>
+      ) : (
+        <button className="link" onClick={() => setShowAdd(true)}>
+          Add a stick by IP…
+        </button>
+      )}
+
+      <h2>Settings</h2>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={state.autostart}
+          onChange={(e) => void helio.setAutostart(e.target.checked)}
+        />
+        Start when I log in to this computer
+      </label>
+      <button className="ghost" onClick={() => void helio.signOut()}>
+        Sign out of Helio
+      </button>
+    </main>
+  );
+}
