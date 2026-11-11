@@ -1,0 +1,247 @@
+:root {
+  color-scheme: dark;
+  --bg: #0c111c;
+  --card: #141c2c;
+  --border: #243043;
+  --text: #e8edf6;
+  --muted: #8b99af;
+  --accent: #f6b73c;
+  --ok: #3ecf78;
+  --bad: #e25555;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+.shell {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100vh;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 26px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #f6b73c33, #f6b73c11);
+  border: 1px solid #f6b73c44;
+  border-radius: 12px;
+}
+
+h1 {
+  font-size: 17px;
+  margin: 0;
+}
+
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  flex: 1;
+}
+
+p {
+  margin: 0 0 10px;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.error {
+  color: var(--bad);
+}
+
+.warn {
+  color: var(--accent);
+  font-size: 12px;
+  margin: 0;
+}
+
+button {
+  background: var(--accent);
+  color: #1c1402;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 6px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button.small {
+  width: auto;
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+button.link {
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  width: auto;
+  padding: 6px 0;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.code {
+  font: 700 30px/1 ui-monospace, "SF Mono", Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-align: center;
+  background: #0c111c;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 18px 10px;
+  margin: 14px 0;
+  user-select: text;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input[type="text"],
+.field input {
+  background: #0c111c;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.statusRow,
+.sticks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sticks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sticks li {
+  background: #0c111c;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.dot.ok {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+.dot.bad {
+  background: var(--bad);
+}
+
+.stickInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.addStick {
+  margin-top: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.addStick .field {
+  margin-top: 0;
+}
+
+.field.grow {
+  flex: 1;
+}
+
+.field.portField {
+  width: 86px;
+  flex: 0 0 auto;
+}
+
+.field.portField input,
+.field.grow input {
+  width: 100%;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.toggle input {
+  accent-color: var(--accent);
+}
