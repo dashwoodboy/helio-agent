@@ -1,0 +1,69 @@
+# Helio Agent releases: publishing a GitHub release builds the installers on
+# all three platforms and attaches them, giving the website stable links:
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent-Setup.exe
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.dmg
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.AppImage
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.deb
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/helio-agent-cli.cjs
+# Point the stack's AGENT_DOWNLOAD_BASE_URL at .../releases/latest/download
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The agent shares the Solarman protocol code with the backend.
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: agent
+      - run: npm run typecheck && npm test
+        working-directory: agent
+      - run: npm run dist
+        working-directory: agent
+        env:
+          HELIO_SERVER_URL: ${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+      # Headless CLI bundle for Linux servers (one file, runs with node >= 20).
+      - run: npm run dist:cli
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: agent
+        env:
+          HELIO_SERVER_URL: ${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+      - name: Attach installers to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            agent/release/*.dmg
+            agent/release/*.exe
+            agent/release/*.AppImage
+            agent/release/*.deb
+            agent/release/helio-agent-cli.cjs
+      - name: Upload artifacts (manual runs)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: helio-agent-${{ matrix.os }}
+          path: |
+            agent/release/*.dmg
+            agent/release/*.exe
+            agent/release/*.AppImage
+            agent/release/*.deb
+            agent/release/helio-agent-cli.cjs
+          if-no-files-found: error
