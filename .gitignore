@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+# CLI self-update signing key: belongs in the AGENT_SIGNING_KEY GitHub
+# secret, never in git (the matching public key lives in selfUpdate.ts).
+scripts/agent-signing-key.private.pem
+# Agent build output (installers, CLI bundle): built by CI, not versioned.
+agent/release/
+portainer-stack.env
+.DS_Store
+coverage/
+playwright-report/
+test-results/
