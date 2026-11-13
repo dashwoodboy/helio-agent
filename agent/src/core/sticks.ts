@@ -1,0 +1,278 @@
+/**
+ * Registry of the sticks discovery found, plus the Modbus executors the
+ * server link calls. The Solarman V5 client is the backend's own
+ * (`@solarman` alias), so the protocol has one source of truth.
+ *
+ * The server only ever names a stick by serial; the address comes from our
+ * own discovery or from the user typing it in — a compromised server cannot
+ * point the agent at arbitrary hosts. Requests are serialized per stick and
+ * sockets close when idle.
+ */
+import { SolarmanClient } from "@solarman/client.js";
+import { isValidIpv4, STICK_TCP_PORT, type DiscoveredStick } from "./discovery.js";
+
+/** A stick disappears from reports when unseen for this long. */
+const STALE_MS = 90_000;
+/** Close a stick's TCP socket after this much inactivity. */
+const IDLE_CLOSE_MS = 60_000;
+/** Mirror of the server's cap on reported sticks. */
+const MAX_REPORTED = 32;
+
+export interface StickReport {
+  serial: number | null;
+  ip: string;
+  mac: string | null;
+  reachable: boolean;
+  /** Added by hand (IP + port) rather than found by discovery. */
+  manual: boolean;
+}
+
+interface StickEntry {
+  ip: string;
+  mac: string | null;
+  serial: number | null;
+  port: number;
+  lastSeenAt: number;
+  /** Manual entries are pinned: they never expire, only report unreachable. */
+  manual: boolean;
+}
+
+interface ClientEntry {
+  client: SolarmanClient;
+  ip: string;
+  chain: Promise<unknown>;
+  idleTimer: NodeJS.Timeout | null;
+}
+
+function assertValidSerial(serial: number): void {
+  if (!Number.isInteger(serial) || serial < 1 || serial > 0xffffffff) {
+    throw new Error(`"${serial}" is not a valid stick serial`);
+  }
+}
+
+export class StickRegistry {
+  /** Keyed by ip (sticks without a serial still get listed). */
+  private readonly entries = new Map<string, StickEntry>();
+  private readonly clients = new Map<number, ClientEntry>();
+
+  /** Merge one discovery round; returns true when the report changed. */
+  update(found: DiscoveredStick[]): boolean {
+    const before = JSON.stringify(this.report());
+    const now = Date.now();
+    for (const stick of found) {
+      if (!isValidIpv4(stick.ip)) continue;
+      const existing = this.entries.get(stick.ip);
+      this.entries.set(stick.ip, {
+        ip: stick.ip,
+        mac: stick.mac ?? existing?.mac ?? null,
+        serial: stick.serial ?? existing?.serial ?? null,
+        port: stick.port ?? existing?.port ?? STICK_TCP_PORT,
+        lastSeenAt: now,
+        manual: existing?.manual ?? false,
+      });
+    }
+    for (const [ip, entry] of this.entries) {
+      if (!entry.manual && now - entry.lastSeenAt > STALE_MS) this.entries.delete(ip);
+    }
+    return JSON.stringify(this.report()) !== before;
+  }
+
+  /**
+   * Pin a stick the user typed in by hand (discovery can't see it: other
+   * subnet, UDP probe ignored, even a public port-forwarded address — the
+   * UI warns when it is not private). It never expires; `markManualSeen`
+   * refreshes its reachability after each probe round.
+   */
+  addManual(ip: string, port = STICK_TCP_PORT, serial: number | null = null): boolean {
+    if (!isValidIpv4(ip)) throw new Error(`"${ip}" is not a valid IPv4 address`);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`"${port}" is not a valid TCP port`);
+    }
+    if (serial !== null) assertValidSerial(serial);
+    const existing = this.entries.get(ip);
+    const before = JSON.stringify(this.report());
+    this.entries.set(ip, {
+      ip,
+      mac: existing?.mac ?? null,
+      serial: serial ?? existing?.serial ?? null,
+      port,
+      // Unseen until the first probe confirms it answers.
+      lastSeenAt: existing?.lastSeenAt ?? 0,
+      manual: true,
+    });
+    return JSON.stringify(this.report()) !== before;
+  }
+
+  /**
+   * The user typed the label serial for a listed stick (manual or discovered
+   * with an unanswered UDP probe). A wrong serial is harmless: the stick
+   * simply ignores frames addressed to someone else.
+   */
+  setSerial(ip: string, serial: number): boolean {
+    assertValidSerial(serial);
+    const entry = this.entries.get(ip);
+    if (!entry) throw new Error(`No stick at ${ip}`);
+    if (entry.serial === serial) return false;
+    entry.serial = serial;
+    return true;
+  }
+
+  /** Unpin a manual stick (also forgets it entirely when discovery can't see it). */
+  removeManual(ip: string): boolean {
+    const entry = this.entries.get(ip);
+    if (!entry?.manual) return false;
+    this.entries.delete(ip);
+    return true;
+  }
+
+  /** Manual entries, so the discovery round knows what to probe. */
+  manualEntries(): { ip: string; port: number }[] {
+    return [...this.entries.values()]
+      .filter((e) => e.manual)
+      .map((e) => ({ ip: e.ip, port: e.port }));
+  }
+
+  /** Every known entry — what a discovery round probes directly. */
+  knownEntries(): { ip: string; port: number; serial: number | null; manual: boolean }[] {
+    return [...this.entries.values()].map((e) => ({
+      ip: e.ip,
+      port: e.port,
+      serial: e.serial,
+      manual: e.manual,
+    }));
+  }
+
+  /** A stick proved it is alive (probe answer, successful RPC): refresh it. */
+  markSeen(ip: string): void {
+    const entry = this.entries.get(ip);
+    if (entry) entry.lastSeenAt = Date.now();
+  }
+
+  /** A manual stick answered a probe: refresh its reachability window. */
+  markManualSeen(ip: string): void {
+    const entry = this.entries.get(ip);
+    if (entry?.manual) entry.lastSeenAt = Date.now();
+  }
+
+  /**
+   * Seed sticks remembered from the previous run (persisted by the shell).
+   * They start unreachable; the first discovery round probes them directly,
+   * so a stick that ignores UDP is back within one round instead of waiting
+   * for the user to re-add it.
+   */
+  seed(sticks: { ip: string; port?: number; serial?: number | null }[]): void {
+    for (const stick of sticks) {
+      if (!isValidIpv4(stick.ip) || this.entries.has(stick.ip)) continue;
+      if (stick.serial != null) {
+        try {
+          assertValidSerial(stick.serial);
+        } catch {
+          continue;
+        }
+      }
+      this.entries.set(stick.ip, {
+        ip: stick.ip,
+        mac: null,
+        serial: stick.serial ?? null,
+        port: stick.port ?? STICK_TCP_PORT,
+        lastSeenAt: 0, // unseen until a probe or RPC confirms it
+        manual: false,
+      });
+    }
+  }
+
+  /** Current sticks, shaped like the hub's `sticks` message. */
+  report(): StickReport[] {
+    const now = Date.now();
+    return [...this.entries.values()]
+      .slice(0, MAX_REPORTED)
+      .map((e) => ({
+        serial: e.serial,
+        ip: e.ip,
+        mac: e.mac,
+        reachable: now - e.lastSeenAt <= STALE_MS,
+        manual: e.manual,
+      }))
+      .sort((a, b) => (a.serial ?? 0) - (b.serial ?? 0) || a.ip.localeCompare(b.ip));
+  }
+
+  // ----------------------------------------------------- Modbus executors
+
+  read(serial: number, addr: number, quantity: number): Promise<number[]> {
+    return this.enqueue(serial, (client) => client.readHoldingRegisters(addr, quantity));
+  }
+
+  async write1(serial: number, addr: number, value: number): Promise<void> {
+    await this.enqueue(serial, (client) => client.writeHoldingRegister(addr, value));
+  }
+
+  async writeN(serial: number, addr: number, values: number[]): Promise<void> {
+    await this.enqueue(serial, (client) => client.writeHoldingRegisters(addr, values));
+  }
+
+  /** Close every open stick socket (shutdown). */
+  async close(): Promise<void> {
+    for (const [serial, entry] of this.clients) {
+      this.clients.delete(serial);
+      if (entry.idleTimer) clearTimeout(entry.idleTimer);
+      await entry.client.disconnect().catch(() => undefined);
+    }
+  }
+
+  private entryForSerial(serial: number): StickEntry | null {
+    for (const entry of this.entries.values()) {
+      if (entry.serial === serial) return entry;
+    }
+    // The user typed the label serial for a stick discovery couldn't identify
+    // (UDP probe unanswered): try the one entry whose serial is unknown. The
+    // V5 protocol echoes the serial in every frame, so a wrong guess simply
+    // gets no answer — and a right one is adopted in enqueue().
+    const unknowns = [...this.entries.values()].filter((e) => e.serial === null);
+    return unknowns.length === 1 ? unknowns[0] : null;
+  }
+
+  private enqueue<T>(serial: number, run: (client: SolarmanClient) => Promise<T>): Promise<T> {
+    const stick = this.entryForSerial(serial);
+    if (!stick) return Promise.reject(new Error(`Stick ${serial} is not visible on this network`));
+
+    let entry = this.clients.get(serial);
+    if (!entry || entry.ip !== stick.ip) {
+      if (entry) void entry.client.disconnect().catch(() => undefined);
+      entry = {
+        client: new SolarmanClient({ address: stick.ip, serial, port: stick.port }),
+        ip: stick.ip,
+        chain: Promise.resolve(),
+        idleTimer: null,
+      };
+      this.clients.set(serial, entry);
+    }
+
+    const current = entry;
+    const task = current.chain.then(
+      () => run(current.client),
+      () => run(current.client),
+    );
+    current.chain = task.catch(() => undefined);
+    void current.chain.then(() => this.scheduleIdleClose(serial, current));
+    // A successful RPC proves the stick is alive — count it as "seen" so it
+    // never goes stale while the server is actively polling it. And if the
+    // entry had no serial yet, the answer proves this IS its serial (V5
+    // sticks ignore mismatched frames): adopt it for proper routing.
+    void task
+      .then(() => {
+        if (stick.serial === null) stick.serial = serial;
+        stick.lastSeenAt = Date.now();
+      })
+      .catch(() => undefined);
+    return task;
+  }
+
+  private scheduleIdleClose(serial: number, entry: ClientEntry): void {
+    if (entry.idleTimer) clearTimeout(entry.idleTimer);
+    entry.idleTimer = setTimeout(() => {
+      if (this.clients.get(serial) === entry) this.clients.delete(serial);
+      void entry.client.disconnect().catch(() => undefined);
+    }, IDLE_CLOSE_MS);
+    entry.idleTimer.unref?.();
+  }
+}
