@@ -1,0 +1,675 @@
+{
+  "id": "f7971b1d-1be6-4a61-a9a0-c11c6e2db72a",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.daily_energy": {
+      "name": "daily_energy",
+      "schema": "",
+      "columns": {
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "pv_kwh": {
+          "name": "pv_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "import_kwh": {
+          "name": "import_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "export_kwh": {
+          "name": "export_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "load_kwh": {
+          "name": "load_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "batt_charge_kwh": {
+          "name": "batt_charge_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "batt_discharge_kwh": {
+          "name": "batt_discharge_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "gen_kwh": {
+          "name": "gen_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pv_to_load_kwh": {
+          "name": "pv_to_load_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pv_to_batt_kwh": {
+          "name": "pv_to_batt_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pv_to_grid_kwh": {
+          "name": "pv_to_grid_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "grid_to_load_kwh": {
+          "name": "grid_to_load_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "grid_to_batt_kwh": {
+          "name": "grid_to_batt_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "batt_to_load_kwh": {
+          "name": "batt_to_load_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "import_day_kwh": {
+          "name": "import_day_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "import_night_kwh": {
+          "name": "import_night_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "peak_pv_w": {
+          "name": "peak_pv_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "peak_load_w": {
+          "name": "peak_load_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "l1_kwh": {
+          "name": "l1_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "l2_kwh": {
+          "name": "l2_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "l3_kwh": {
+          "name": "l3_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "soc_min": {
+          "name": "soc_min",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "soc_max": {
+          "name": "soc_max",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batt_v_min": {
+          "name": "batt_v_min",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batt_v_max": {
+          "name": "batt_v_max",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'integrated'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.daily_weather": {
+      "name": "daily_weather",
+      "schema": "",
+      "columns": {
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "weather_code": {
+          "name": "weather_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_max": {
+          "name": "temp_max",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_min": {
+          "name": "temp_min",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precip_mm": {
+          "name": "precip_mm",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "radiation_kwh_m2": {
+          "name": "radiation_kwh_m2",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "forecast_pv_kwh": {
+          "name": "forecast_pv_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_pv_kwh": {
+          "name": "actual_pv_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sunrise": {
+          "name": "sunrise",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sunset": {
+          "name": "sunset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.generator_sessions": {
+      "name": "generator_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "runtime_s": {
+          "name": "runtime_s",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "energy_kwh": {
+          "name": "energy_kwh",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "avg_w": {
+          "name": "avg_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "gen_started_idx": {
+          "name": "gen_started_idx",
+          "columns": [
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notifications": {
+      "name": "notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ts": {
+          "name": "ts",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "rule": {
+          "name": "rule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'info'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "read": {
+          "name": "read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "notifications_ts_idx": {
+          "name": "notifications_ts_idx",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.outage_events": {
+      "name": "outage_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_s": {
+          "name": "duration_s",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_soc": {
+          "name": "min_soc",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "outage_started_idx": {
+          "name": "outage_started_idx",
+          "columns": [
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.settings": {
+      "name": "settings",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.telemetry": {
+      "name": "telemetry",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ts": {
+          "name": "ts",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pv1_w": {
+          "name": "pv1_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pv2_w": {
+          "name": "pv2_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pv_w": {
+          "name": "pv_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "load_w": {
+          "name": "load_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "grid_w": {
+          "name": "grid_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "batt_w": {
+          "name": "batt_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "batt_v": {
+          "name": "batt_v",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batt_a": {
+          "name": "batt_a",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "soc": {
+          "name": "soc",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grid_v": {
+          "name": "grid_v",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grid_hz": {
+          "name": "grid_hz",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gen_w": {
+          "name": "gen_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "dc_temp": {
+          "name": "dc_temp",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "heatsink_temp": {
+          "name": "heatsink_temp",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l1_w": {
+          "name": "l1_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l2_w": {
+          "name": "l2_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l3_w": {
+          "name": "l3_w",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l1_v": {
+          "name": "l1_v",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l2_v": {
+          "name": "l2_v",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l3_v": {
+          "name": "l3_v",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "telemetry_ts_brin": {
+          "name": "telemetry_ts_brin",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "brin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

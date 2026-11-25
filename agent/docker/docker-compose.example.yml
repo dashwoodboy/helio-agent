@@ -1,0 +1,28 @@
+# Helio Agent as an always-on container (Portainer, TrueNAS, Synology,
+# any Linux box). Paste this stack, start it, then check the logs for the
+# pairing code and approve it on the website — done.
+#
+# NOTES
+# - network_mode: host is required so UDP discovery finds the stick on your
+#   LAN. It only works on Linux hosts (TrueNAS SCALE, Synology DSM 7.2+,
+#   a Pi, any Linux server) — NOT on Docker Desktop for Mac/Windows.
+#   If host networking isn't possible, keep the default network and add the
+#   stick by IP once, from inside the container:
+#     docker exec -it helio-agent node /app/helio-agent-cli.cjs add-stick --ip 192.168.1.137
+# - The volume keeps the pairing token across updates and re-creates.
+services:
+  helio-agent:
+    image: dashwoodboy/helio-agent:latest
+    container_name: helio-agent
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # Your Helio server (default: https://helio-power.eu).
+      # HELIO_SERVER_URL: https://helio.example.com
+      # The name shown on the website's approval page and agent list.
+      HELIO_AGENT_NAME: "NAS"
+    volumes:
+      - helio-agent-config:/config
+
+volumes:
+  helio-agent-config:

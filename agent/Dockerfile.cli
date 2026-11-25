@@ -1,0 +1,42 @@
+# Helio Agent (headless CLI) — always-on relay for NAS / home servers.
+#
+# Build from the REPOSITORY ROOT (the CLI shares the Solarman protocol code
+# with the backend):
+#
+#   docker build -f agent/Dockerfile.cli -t dashwoodboy/helio-agent .
+#
+# Run with host networking so UDP discovery can see the local network
+# (host networking only works on Linux hosts — not Docker Desktop on
+# Mac/Windows; there, add the stick by IP instead):
+#
+#   docker run -d --name helio-agent --network host \
+#     -v helio-agent-config:/config \
+#     -e HELIO_AGENT_NAME="NAS" \
+#     dashwoodboy/helio-agent
+#
+# First start prints a pairing code in the logs (docker logs -f helio-agent);
+# approve it on the website and the agent starts relaying.
+
+FROM node:24-alpine AS build
+WORKDIR /src
+# Dependency layer first so code edits don't re-install. --ignore-scripts
+# skips the Electron binary download (not needed for the CLI bundle).
+COPY agent/package.json agent/package-lock.json agent/
+RUN cd agent && npm ci --ignore-scripts
+COPY agent agent
+COPY backend/src/solarman backend/src/solarman
+ARG HELIO_SERVER_URL=https://helio-power.eu
+RUN cd agent && HELIO_SERVER_URL=$HELIO_SERVER_URL node scripts/build-cli.mjs
+
+FROM node:24-alpine
+RUN apk add --no-cache tini
+COPY --from=build /src/agent/release/helio-agent-cli.cjs /app/helio-agent-cli.cjs
+COPY agent/docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+  && addgroup -S helio && adduser -S -G helio helio \
+  && mkdir -p /config && chown helio:helio /config
+# The CLI stores its token in $XDG_CONFIG_HOME/helio-agent/config.json.
+ENV XDG_CONFIG_HOME=/config
+VOLUME /config
+USER helio
+ENTRYPOINT ["/sbin/tini", "--", "/app/entrypoint.sh"]

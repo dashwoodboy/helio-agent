@@ -1,0 +1,189 @@
+# Helio Agent releases: publishing a GitHub release builds the installers on
+# all three platforms and attaches them, giving the website stable links:
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent-Setup.exe
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.dmg
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.AppImage
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/HelioAgent.deb
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/helio-agent-cli.cjs
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/install-helio-agent.sh
+#   https://github.com/dashwoodboy/helio-agent/releases/latest/download/os-list.json
+# Point the stack's AGENT_DOWNLOAD_BASE_URL at .../releases/latest/download
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The agent shares the Solarman protocol code with the backend.
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: agent
+      - run: npm run typecheck && npm test
+        working-directory: agent
+      - run: npm run dist
+        working-directory: agent
+        env:
+          HELIO_SERVER_URL: ${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+      # Headless CLI bundle for Linux servers (one file, runs with node >= 20).
+      - run: npm run dist:cli
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: agent
+        env:
+          HELIO_SERVER_URL: ${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+      # Sign the CLI bundle for self-update (.sha256 + .sig). Without the
+      # AGENT_SIGNING_KEY secret the release still works; deployed agents
+      # just refuse to self-update to it.
+      - run: |
+          if [ -n "$AGENT_SIGNING_KEY" ]; then
+            node ../scripts/sign-cli.mjs release/helio-agent-cli.cjs
+          else
+            echo "AGENT_SIGNING_KEY not set — skipping CLI signing"
+          fi
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: agent
+        env:
+          AGENT_SIGNING_KEY: ${{ secrets.AGENT_SIGNING_KEY }}
+      - name: Attach installers to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            agent/release/*.dmg
+            agent/release/*.exe
+            agent/release/*.AppImage
+            agent/release/*.deb
+            agent/release/helio-agent-cli.cjs
+            agent/release/helio-agent-cli.cjs.sha256
+            agent/release/helio-agent-cli.cjs.sig
+            scripts/install-helio-agent.sh
+      - name: Upload artifacts (manual runs)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: helio-agent-${{ matrix.os }}
+          path: |
+            agent/release/*.dmg
+            agent/release/*.exe
+            agent/release/*.AppImage
+            agent/release/*.deb
+            agent/release/helio-agent-cli.cjs
+          if-no-files-found: error
+
+  # Always-on container image (NAS, Pi, home servers): multi-arch
+  # dashwoodboy/helio-agent. Skipped when the Docker Hub secrets are not
+  # configured on the repository.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Docker Hub credentials and compute tags
+        id: creds
+        env:
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$DOCKER_USER" ] && [ "$HAS_TOKEN" = "true" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          TAGS="$DOCKER_USER/helio-agent:latest"
+          case "$REF_NAME" in
+            v*) TAGS="$TAGS,$DOCKER_USER/helio-agent:${REF_NAME#v}" ;;
+          esac
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+        if: steps.creds.outputs.ok == 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: steps.creds.outputs.ok == 'true'
+      - uses: docker/login-action@v3
+        if: steps.creds.outputs.ok == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: steps.creds.outputs.ok == 'true'
+        with:
+          context: .
+          file: agent/Dockerfile.cli
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.creds.outputs.tags }}
+          build-args: |
+            HELIO_SERVER_URL=${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+
+  # "Helio Agent for Raspberry Pi" image: official Raspberry Pi OS Lite
+  # arm64 + Node 24 + the agent CLI as a systemd service. Attached to the
+  # release with os-list.json so the Raspberry Pi Imager has one stable URL:
+  #   https://github.com/dashwoodboy/helio-agent/releases/latest/download/os-list.json
+  pi-image:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The CLI bundle shares the Solarman protocol code with the backend.
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci --ignore-scripts
+        working-directory: agent
+      - run: node scripts/build-cli.mjs
+        working-directory: agent
+        env:
+          HELIO_SERVER_URL: ${{ vars.HELIO_SERVER_URL || 'https://helio-power.eu' }}
+      # Self-update companions (skipped without the signing secret).
+      - run: |
+          if [ -n "$AGENT_SIGNING_KEY" ]; then
+            node scripts/sign-cli.mjs agent/release/helio-agent-cli.cjs
+          else
+            echo "AGENT_SIGNING_KEY not set — skipping CLI signing"
+          fi
+        env:
+          AGENT_SIGNING_KEY: ${{ secrets.AGENT_SIGNING_KEY }}
+
+      - name: Build the image (chroot customization of Raspberry Pi OS Lite)
+        run: sudo scripts/pi-image/build-image.sh agent/release/helio-agent-cli.cjs out
+
+      # build-image.sh ran as root, so hand the output back to the runner user.
+      - run: sudo chown -R "$(id -u):$(id -g)" out
+
+      - name: Generate os-list.json for the Raspberry Pi Imager
+        run: node scripts/pi-image/make-os-list.mjs out/image-meta.json out/os-list.json "${GITHUB_REF_NAME#v}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helio-agent-pi-image
+          path: |
+            out/HelioAgent-Pi.img.xz
+            out/image-meta.json
+            out/os-list.json
+          if-no-files-found: error
+          compression-level: 0 # already xz
+
+      # Attach to the release so the "latest" URLs work.
+      - uses: softprops/action-gh-release@v2
+        if: github.event_name == 'release'
+        with:
+          files: |
+            out/HelioAgent-Pi.img.xz
+            out/image-meta.json
+            out/os-list.json

@@ -1,0 +1,1 @@
+ALTER TABLE "notifications" ADD COLUMN "signature" text DEFAULT '' NOT NULL;
